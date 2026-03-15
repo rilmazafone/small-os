@@ -2,30 +2,7 @@
 [extern irq_handler]
 
 isr_common_stub:
-	pusha
-	mov ax, ds
-	push eax
-	mov ax, 0x10
-	mov ds, ax
-	mov es, ax
-	mov fs, ax
-	mov gs, ax
-	
-	call isr_handler
-	
-	pop eax 
-	mov ds, ax
-	mov es, ax
-	mov fs, ax
-	mov gs, ax
-	popa
-	add esp, 8
-	sti
-	iret 
-
-
-irq_common_stub:
-    pusha 
+    pusha
     mov ax, ds
     push eax
     mov ax, 0x10
@@ -33,16 +10,39 @@ irq_common_stub:
     mov es, ax
     mov fs, ax
     mov gs, ax
-    call irq_handler
-    pop ebx
-    mov ds, bx
-    mov es, bx
-    mov fs, bx
-    mov gs, bx
+
+    call isr_handler
+
+    pop eax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
     popa
     add esp, 8
-    sti
-    iret 
+    iret
+
+
+irq_common_stub:
+    pusha
+    mov ax, ds
+    push eax
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    call irq_handler
+
+    pop eax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    popa
+    add esp, 8
+    iret
 	
 
 global isr0

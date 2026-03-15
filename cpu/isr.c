@@ -111,13 +111,17 @@ char *exception_messages[] = {
 };
 
 void isr_handler(registers_t r) {
-    kprint("received interrupt: ");
-    char s[3];
-    int_to_ascii(r.int_no, s);
-    kprint(s);
-    kprint("\n");
-    kprint(exception_messages[r.int_no]);
-    kprint("\n");
+    if (r.int_no < 32) {
+        kprint("received exception: ");
+        char s[3];
+        int_to_ascii(r.int_no, s);
+        kprint(s);
+        kprint("\n");
+        kprint(exception_messages[r.int_no]);
+        kprint("\n");
+    } else {
+        return;
+    }
 }
 
 void register_interrupt_handler(u8 n, isr_t handler) {

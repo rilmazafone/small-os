@@ -1,4 +1,5 @@
 [bits 32]
-[extern main]
-call main 
-jmp $
+global _start
+_start:
+    call main
+    jmp $
