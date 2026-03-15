@@ -1,64 +1,55 @@
-# ================================
-# Project sources
-# ================================
-C_SOURCES := $(wildcard kernel/*.c drivers/*.c)
-HEADERS   := $(wildcard kernel/*.h drivers/*.h)
-OBJ       := $(C_SOURCES:.c=.o) boot/kernel_entry.o
+# Detect all C files
+C_SOURCES := $(wildcard kernel/*.c drivers/*.c cpu/*.c)
+HEADERS := $(wildcard kernel/*.h drivers/*.h cpu/*.h)
 
-# ================================
-# Tools (auto-detect if possible)
-# ================================
-CC := $(shell which i386-elf-gcc || echo /usr/local/i386elfgcc/bin/i386-elf-gcc)
-LD := $(shell which i386-elf-ld || echo /usr/local/i386elfgcc/bin/i386-elf-ld)
-GDB := $(shell which i386-elf-gdb || echo /usr/local/i386elfgcc/bin/i386-elf-gdb)
-NASM := $(shell which nasm)
+# Replace .c with .o
+OBJ := $(C_SOURCES:.c=.o) cpu/interrupt.o
+
+# Cross compiler tools
+CC := i386-elf-gcc
+LD := i386-elf-ld
+GDB := i386-elf-gdb
 
 # Compiler flags
-CFLAGS := -g -ffreestanding -O2 -Wall
-
-# ================================
-# Build rules
-# ================================
+CFLAGS := -g -ffreestanding -Wall -Wextra -m32
 
 # Default target
 all: os-image.bin
 
-# Combine boot sector + kernel
+# Build OS image
 os-image.bin: boot/bootsect.bin kernel.bin
-	cat $^ > $@
+	cat $^ > os-image.bin
 
-# Link kernel into a flat binary
-kernel.bin: $(OBJ)
+# Link kernel
+kernel.bin: boot/kernel_entry.o $(OBJ)
 	$(LD) -o $@ -Ttext 0x1000 $^ --oformat binary
 
-# Link kernel with symbols for debugging
-kernel.elf: $(OBJ)
+# Kernel ELF (for debugging)
+kernel.elf: boot/kernel_entry.o $(OBJ)
 	$(LD) -o $@ -Ttext 0x1000 $^
 
-# ================================
-# Run & debug
-# ================================
+# Run in QEMU
 run: os-image.bin
-	qemu-system-i386 -fda $<
+	qemu-system-i386 -fda os-image.bin
 
+# Debug with GDB
 debug: os-image.bin kernel.elf
-	qemu-system-i386 -s -fda os-image.bin &
+	qemu-system-i386 -s -S -fda os-image.bin &
 	$(GDB) -ex "target remote localhost:1234" -ex "symbol-file kernel.elf"
 
-# ================================
-# Compile C and assembly
-# ================================
+# Compile C files
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-boot/%.o: boot/%.asm
-	$(NASM) $< -f elf -o $@
+# Assemble ELF object files
+%.o: %.asm
+	nasm $< -f elf -o $@
 
-boot/%.bin: boot/%.asm
-	$(NASM) $< -f bin -o $@
+# Assemble raw binary (boot sector)
+%.bin: %.asm
+	nasm $< -f bin -o $@
 
-# ================================
-# Clean build artifacts
-# ================================
+# Clean build files
 clean:
-	rm -rf *.bin *.elf *.dis $(OBJ) boot/*.bin boot/*.o kernel/*.o drivers/*.o
+	rm -rf *.bin *.elf *.o os-image.bin
+	rm -rf kernel/*.o drivers/*.o cpu/*.o boot/*.o boot/*.bin
