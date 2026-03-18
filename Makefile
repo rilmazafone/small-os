@@ -1,55 +1,47 @@
-# Detect all C files
-C_SOURCES := $(wildcard kernel/*.c drivers/*.c cpu/*.c)
-HEADERS := $(wildcard kernel/*.h drivers/*.h cpu/*.h)
+C_SOURCES = $(wildcard kernel/*.c drivers/*.c cpu/*.c libc/*.c)
+HEADERS = $(wildcard kernel/*.h drivers/*.h cpu/*.h libc/*.h)
+# Nice syntax for file extension replacement
+OBJ = ${C_SOURCES:.c=.o cpu/interrupt.o} 
 
-# Replace .c with .o
-OBJ := $(C_SOURCES:.c=.o) cpu/interrupt.o
+# Change this if your cross-compiler is somewhere else
+CC = /home/relt/opt/cross/bin/i386-elf-gcc
+GDB = /usr/local/i386elfgcc/bin/i386-elf-gdb
+# -g: Use debugging symbols in gcc
+CFLAGS = -g -m32 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -nostartfiles -nodefaultlibs \
+		 -Wall -Wextra -Werror
 
-# Cross compiler tools
-CC := i386-elf-gcc
-LD := i386-elf-ld
-GDB := i386-elf-gdb
-
-# Compiler flags
-CFLAGS := -g -ffreestanding -Wall -Wextra -m32
-
-# Default target
-all: os-image.bin
-
-# Build OS image
+# First rule is run by default
 os-image.bin: boot/bootsect.bin kernel.bin
 	cat $^ > os-image.bin
 
-# Link kernel
-kernel.bin: boot/kernel_entry.o $(OBJ)
-	$(LD) -o $@ -Ttext 0x1000 $^ --oformat binary
+# '--oformat binary' deletes all symbols as a collateral, so we don't need
+# to 'strip' them manually on this case
+kernel.bin: boot/kernel_entry.o ${OBJ}
+	i386-elf-ld -o $@ -Ttext 0x1000 $^ --oformat binary
 
-# Kernel ELF (for debugging)
-kernel.elf: boot/kernel_entry.o $(OBJ)
-	$(LD) -o $@ -Ttext 0x1000 $^
+# Used for debugging purposes
+kernel.elf: boot/kernel_entry.o ${OBJ}
+	i386-elf-ld -o $@ -Ttext 0x1000 $^ 
 
-# Run in QEMU
 run: os-image.bin
 	qemu-system-i386 -fda os-image.bin
 
-# Debug with GDB
+# Open the connection to qemu and load our kernel-object file with symbols
 debug: os-image.bin kernel.elf
-	qemu-system-i386 -s -S -fda os-image.bin &
-	$(GDB) -ex "target remote localhost:1234" -ex "symbol-file kernel.elf"
+	qemu-system-i386 -s -fda os-image.bin -d guest_errors,int &
+	${GDB} -ex "target remote localhost:1234" -ex "symbol-file kernel.elf"
 
-# Compile C files
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $< -o $@
+# Generic rules for wildcards
+# To make an object, always compile from its .c
+%.o: %.c ${HEADERS}
+	${CC} ${CFLAGS} -ffreestanding -c $< -o $@
 
-# Assemble ELF object files
 %.o: %.asm
 	nasm $< -f elf -o $@
 
-# Assemble raw binary (boot sector)
 %.bin: %.asm
 	nasm $< -f bin -o $@
 
-# Clean build files
 clean:
-	rm -rf *.bin *.elf *.o os-image.bin
-	rm -rf kernel/*.o drivers/*.o cpu/*.o boot/*.o boot/*.bin
+	rm -rf *.bin *.dis *.o os-image.bin *.elf
+	rm -rf kernel/*.o boot/*.bin drivers/*.o boot/*.o cpu/*.o libc/*.o

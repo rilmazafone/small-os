@@ -1,8 +1,10 @@
 #include "isr.h"
 #include "idt.h"
 #include "../drivers/screen.h"
-#include "../kernel/util.h"
-#include "../drivers/ports.h"
+#include "../drivers/keyboard.h"
+#include "../libc/string.h"
+#include "timer.h"
+#include "ports.h"
 
 isr_t interrupt_handlers[256];
 
@@ -39,7 +41,6 @@ void isr_install() {
     set_idt_gate(29, (u32)isr29);
     set_idt_gate(30, (u32)isr30);
     set_idt_gate(31, (u32)isr31);
-
 
     port_byte_out(0x20, 0x11);
     port_byte_out(0xA0, 0x11);
@@ -111,17 +112,13 @@ char *exception_messages[] = {
 };
 
 void isr_handler(registers_t r) {
-    if (r.int_no < 32) {
-        kprint("received exception: ");
-        char s[3];
-        int_to_ascii(r.int_no, s);
-        kprint(s);
-        kprint("\n");
-        kprint(exception_messages[r.int_no]);
-        kprint("\n");
-    } else {
-        return;
-    }
+    kprint("received interrupt: ");
+    char s[3];
+    int_to_ascii(r.int_no, s);
+    kprint(s);
+    kprint("\n");
+    kprint(exception_messages[r.int_no]);
+    kprint("\n");
 }
 
 void register_interrupt_handler(u8 n, isr_t handler) {
@@ -136,4 +133,10 @@ void irq_handler(registers_t r) {
         isr_t handler = interrupt_handlers[r.int_no];
         handler(r);
     }
+}
+
+void irq_install() {
+    asm volatile("sti");
+    init_timer(50);
+    init_keyboard();
 }
