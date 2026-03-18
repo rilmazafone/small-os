@@ -192,8 +192,9 @@ void print_letter(u8 scancode) {
 }
 
 static void keyboard_callback(registers_t regs){
+    (void)regs;
     u8 scancode = port_byte_in(0x60);
-    char *sc_ascii;
+    char sc_ascii[10];
     int_to_ascii(scancode,sc_ascii);
     kprint("Keyboard scancode: ");
     kprint(sc_ascii);
